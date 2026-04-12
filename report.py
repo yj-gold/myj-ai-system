@@ -345,10 +345,17 @@ def generate_console_report(
 ) -> None:
     """Print the full analytics report to stdout."""
     print()
-    print(_bold(_cyan("╔══════════════════════════════════════════════════════════════════╗")))
-    print(_bold(_cyan("║        IG MARKETS  —  TRADING ANALYTICS REPORT                  ║")))
-    print(_bold(_cyan(f"║        Generated: {datetime.utcnow().strftime('%Y-%m-%d %H:%M UTC'):<47}║")))
-    print(_bold(_cyan("╚══════════════════════════════════════════════════════════════════╝")))
+    print(_bold(_cyan("╔══════════════════════════════════════════════════════════════════════╗")))
+    print(_bold(_cyan("║   ███╗   ███╗██╗   ██╗     ██╗     ██████╗ █████╗ ██████╗           ║")))
+    print(_bold(_cyan("║   ████╗ ████║╚██╗ ██╔╝     ██║    ██╔════╝██╔══██╗██╔══██╗          ║")))
+    print(_bold(_cyan("║   ██╔████╔██║ ╚████╔╝      ██║    ██║     ███████║██████╔╝          ║")))
+    print(_bold(_cyan("║   ██║╚██╔╝██║  ╚██╔╝       ██║    ██║     ██╔══██║██╔═══╝           ║")))
+    print(_bold(_cyan("║   ██║ ╚═╝ ██║   ██║        ██║    ╚██████╗██║  ██║██║               ║")))
+    print(_bold(_cyan("║   ╚═╝     ╚═╝   ╚═╝        ╚═╝     ╚═════╝╚═╝  ╚═╝╚═╝               ║")))
+    print(_bold(_cyan("║                                                                      ║")))
+    print(_bold(_cyan("║              MYJ CAPITAL  —  TRADING ANALYTICS REPORT               ║")))
+    print(_bold(_cyan(f"║              Generated : {datetime.utcnow().strftime('%Y-%m-%d %H:%M UTC'):<45}║")))
+    print(_bold(_cyan("╚══════════════════════════════════════════════════════════════════════╝")))
 
     if "error" in analytics:
         print(_red(f"\n  ERROR: {analytics['error']}"))
