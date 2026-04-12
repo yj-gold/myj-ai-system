@@ -13,12 +13,14 @@ produces a detailed strategy performance report including:
   • Open positions summary
   • CSV exports for transactions, activity and equity curve
   • JSON export of the full analytics object
+  • HTML email report sent automatically via SMTP
 
 Usage
 -----
 1. Copy .env.example → .env and fill in your IG credentials + API key.
-2. pip install -r requirements.txt
-3. python main.py
+2. Add EMAIL_* settings to .env for automatic email delivery.
+3. pip install -r requirements.txt
+4. python main.py
 
 Optional CLI flags
 ------------------
@@ -26,6 +28,7 @@ Optional CLI flags
   --to   YYYY-MM-DD   End date   (default: today)
   --no-activity       Skip fetching activity log (faster)
   --no-export         Do not write CSV / JSON files
+  --no-email          Skip sending the email report
   --output-dir PATH   Directory for exports (default: ./output)
   --demo              Force demo account endpoint
   --debug             Enable verbose logging
@@ -46,6 +49,7 @@ from report import (
     export_analytics_json,
     export_equity_curve_csv,
 )
+from email_report import build_html_email, send_email_report
 
 
 def parse_args() -> argparse.Namespace:
@@ -78,6 +82,10 @@ def parse_args() -> argparse.Namespace:
     p.add_argument(
         "--demo", action="store_true",
         help="Use the IG demo endpoint regardless of IG_ACCOUNT_TYPE",
+    )
+    p.add_argument(
+        "--no-email", action="store_true",
+        help="Skip sending the HTML email report",
     )
     p.add_argument(
         "--debug", action="store_true",
@@ -183,6 +191,25 @@ def main() -> None:
             export_analytics_json(analytics, args.output_dir)
             if "equity_curve" in analytics and analytics["equity_curve"]:
                 export_equity_curve_csv(analytics["equity_curve"], args.output_dir)
+            print()
+
+        # -----------------------------------------------------------------
+        # 9. Email report
+        # -----------------------------------------------------------------
+        if not args.no_email:
+            print("  Building and sending email report …")
+            html = build_html_email(
+                analytics=analytics,
+                accounts=accounts,
+                from_date=args.from_date,
+                to_date=args.to_date,
+            )
+            send_email_report(
+                html=html,
+                analytics=analytics,
+                from_date=args.from_date,
+                to_date=args.to_date,
+            )
             print()
 
     except IGAPIError as exc:
