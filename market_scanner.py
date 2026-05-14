@@ -255,8 +255,8 @@ def parse_args():
     p = argparse.ArgumentParser(description="MYJ Capital market scanner")
     p.add_argument("--search",    metavar="TERM",
                    help="Search IG for markets matching TERM and print their epic codes")
-    p.add_argument("--min-score", type=int, default=50,
-                   help="Only show signals with score >= this (default 50)")
+    p.add_argument("--min-score", type=int, default=30,
+                   help="Only show signals with score >= this (default 30)")
     p.add_argument("--risk-pct",  type=float, default=DEFAULT_RISK_PCT,
                    help=f"% of equity to risk per trade unit (default {DEFAULT_RISK_PCT})")
     p.add_argument("--save",      action="store_true",

@@ -204,7 +204,7 @@ class TurtleCTAStrategy:
         atr_stop:   float = 2.0,
         atr_target: float = 4.0,
         min_adx:    float = 20.0,
-        min_score:  int   = 50,
+        min_score:  int   = 30,
     ):
         self.equity     = account_equity
         self.risk_pct   = risk_pct

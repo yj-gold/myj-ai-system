@@ -1,25 +1,90 @@
 """
 MYJ Capital — Market universe configuration.
 
-Contains IG epic codes for all commodities and FX pairs we scan.
+Contains IG epic codes for all commodities, FX, indices, and bonds we scan.
 Epic codes are for UK Spread Bet (Daily Funded Bet) accounts.
 
 If an epic doesn't work on your account, use the search helper:
-    python market_scanner.py --search "Gold"
-which calls GET /markets?searchTerm=... and lists valid epics.
+    python market_scanner.py --search "Corn"
+which calls GET /markets?searchTerm=... and lists valid epics for your account.
 """
 
-# Each entry:
-#   name        : human-readable label
-#   epic        : IG spreadbet DFB epic code
-#   type        : COMMODITY | FX | INDEX
-#   point_value : £ per point per £1/point bet (always 1 for spreadbet)
-#   min_size    : minimum bet size (£/point)
-#   currency    : price currency
-#   pip_size    : smallest price increment (for display)
-
 MARKETS = [
-    # ── COMMODITIES ──────────────────────────────────────────────────────────
+    # ── EQUITY INDICES ───────────────────────────────────────────────────────
+    {
+        "name":        "US 500 (S&P)",
+        "epic":        "IX.D.SPTRD.DAILY.IP",
+        "type":        "INDEX",
+        "point_value": 1.0,
+        "min_size":    0.5,
+        "currency":    "USD",
+        "pip_size":    0.1,
+    },
+    {
+        "name":        "Wall Street (Dow)",
+        "epic":        "IX.D.DOW.DAILY.IP",
+        "type":        "INDEX",
+        "point_value": 1.0,
+        "min_size":    0.5,
+        "currency":    "USD",
+        "pip_size":    1.0,
+    },
+    {
+        "name":        "NASDAQ 100",
+        "epic":        "IX.D.NASDAQ.DAILY.IP",
+        "type":        "INDEX",
+        "point_value": 1.0,
+        "min_size":    0.5,
+        "currency":    "USD",
+        "pip_size":    0.1,
+    },
+    {
+        "name":        "UK 100 (FTSE)",
+        "epic":        "IX.D.FTSE.DAILY.IP",
+        "type":        "INDEX",
+        "point_value": 1.0,
+        "min_size":    0.5,
+        "currency":    "GBP",
+        "pip_size":    0.1,
+    },
+    {
+        "name":        "Germany 40 (DAX)",
+        "epic":        "IX.D.DAX.DAILY.IP",
+        "type":        "INDEX",
+        "point_value": 1.0,
+        "min_size":    0.5,
+        "currency":    "EUR",
+        "pip_size":    0.1,
+    },
+    {
+        "name":        "France 40 (CAC)",
+        "epic":        "IX.D.CAC.DAILY.IP",
+        "type":        "INDEX",
+        "point_value": 1.0,
+        "min_size":    0.5,
+        "currency":    "EUR",
+        "pip_size":    0.1,
+    },
+    {
+        "name":        "Japan 225 (Nikkei)",
+        "epic":        "IX.D.NIKKEI.DAILY.IP",
+        "type":        "INDEX",
+        "point_value": 1.0,
+        "min_size":    0.5,
+        "currency":    "JPY",
+        "pip_size":    1.0,
+    },
+    {
+        "name":        "Australia 200",
+        "epic":        "IX.D.ASX.DAILY.IP",
+        "type":        "INDEX",
+        "point_value": 1.0,
+        "min_size":    0.5,
+        "currency":    "AUD",
+        "pip_size":    0.1,
+    },
+
+    # ── PRECIOUS METALS & COMMODITIES ────────────────────────────────────────
     {
         "name":        "Gold",
         "epic":        "CS.D.CFDGOLD.CFDQ.IP",
@@ -38,6 +103,35 @@ MARKETS = [
         "currency":    "USD",
         "pip_size":    0.01,
     },
+    {
+        "name":        "Copper",
+        "epic":        "MT.D.HG.DAILY.IP",
+        "type":        "COMMODITY",
+        "point_value": 1.0,
+        "min_size":    0.5,
+        "currency":    "USD",
+        "pip_size":    0.001,
+    },
+    {
+        "name":        "Platinum",
+        "epic":        "MT.D.PT.DAILY.IP",
+        "type":        "COMMODITY",
+        "point_value": 1.0,
+        "min_size":    0.5,
+        "currency":    "USD",
+        "pip_size":    0.1,
+    },
+    {
+        "name":        "Palladium",
+        "epic":        "MT.D.PA.DAILY.IP",
+        "type":        "COMMODITY",
+        "point_value": 1.0,
+        "min_size":    0.5,
+        "currency":    "USD",
+        "pip_size":    0.1,
+    },
+
+    # ── ENERGY ───────────────────────────────────────────────────────────────
     {
         "name":        "Brent Crude Oil",
         "epic":        "IC.D.BRENT.DAILY.IP",
@@ -65,6 +159,63 @@ MARKETS = [
         "currency":    "USD",
         "pip_size":    0.001,
     },
+
+    # ── SOFT COMMODITIES ─────────────────────────────────────────────────────
+    {
+        "name":        "Corn",
+        "epic":        "AG.D.CORN.DAILY.IP",
+        "type":        "COMMODITY",
+        "point_value": 1.0,
+        "min_size":    0.5,
+        "currency":    "USD",
+        "pip_size":    0.01,
+    },
+    {
+        "name":        "Wheat",
+        "epic":        "AG.D.WHEAT.DAILY.IP",
+        "type":        "COMMODITY",
+        "point_value": 1.0,
+        "min_size":    0.5,
+        "currency":    "USD",
+        "pip_size":    0.01,
+    },
+    {
+        "name":        "Soybeans",
+        "epic":        "AG.D.SOYA.DAILY.IP",
+        "type":        "COMMODITY",
+        "point_value": 1.0,
+        "min_size":    0.5,
+        "currency":    "USD",
+        "pip_size":    0.01,
+    },
+    {
+        "name":        "Sugar",
+        "epic":        "AG.D.SUGAR.DAILY.IP",
+        "type":        "COMMODITY",
+        "point_value": 1.0,
+        "min_size":    0.5,
+        "currency":    "USD",
+        "pip_size":    0.01,
+    },
+    {
+        "name":        "Coffee",
+        "epic":        "AG.D.COFFEE.DAILY.IP",
+        "type":        "COMMODITY",
+        "point_value": 1.0,
+        "min_size":    0.5,
+        "currency":    "USD",
+        "pip_size":    0.01,
+    },
+    {
+        "name":        "Cocoa",
+        "epic":        "AG.D.COCOA.DAILY.IP",
+        "type":        "COMMODITY",
+        "point_value": 1.0,
+        "min_size":    0.5,
+        "currency":    "USD",
+        "pip_size":    0.1,
+    },
+
     # ── FX MAJORS ────────────────────────────────────────────────────────────
     {
         "name":        "EUR/USD",
@@ -112,15 +263,6 @@ MARKETS = [
         "pip_size":    0.0001,
     },
     {
-        "name":        "EUR/GBP",
-        "epic":        "CS.D.EURGBP.MINI.IP",
-        "type":        "FX",
-        "point_value": 1.0,
-        "min_size":    0.5,
-        "currency":    "GBP",
-        "pip_size":    0.0001,
-    },
-    {
         "name":        "USD/CAD",
         "epic":        "CS.D.USDCAD.MINI.IP",
         "type":        "FX",
@@ -138,6 +280,145 @@ MARKETS = [
         "currency":    "USD",
         "pip_size":    0.0001,
     },
+
+    # ── FX CROSSES ───────────────────────────────────────────────────────────
+    {
+        "name":        "EUR/GBP",
+        "epic":        "CS.D.EURGBP.MINI.IP",
+        "type":        "FX",
+        "point_value": 1.0,
+        "min_size":    0.5,
+        "currency":    "GBP",
+        "pip_size":    0.0001,
+    },
+    {
+        "name":        "EUR/JPY",
+        "epic":        "CS.D.EURJPY.MINI.IP",
+        "type":        "FX",
+        "point_value": 1.0,
+        "min_size":    0.5,
+        "currency":    "JPY",
+        "pip_size":    0.01,
+    },
+    {
+        "name":        "GBP/JPY",
+        "epic":        "CS.D.GBPJPY.MINI.IP",
+        "type":        "FX",
+        "point_value": 1.0,
+        "min_size":    0.5,
+        "currency":    "JPY",
+        "pip_size":    0.01,
+    },
+    {
+        "name":        "AUD/JPY",
+        "epic":        "CS.D.AUDJPY.MINI.IP",
+        "type":        "FX",
+        "point_value": 1.0,
+        "min_size":    0.5,
+        "currency":    "JPY",
+        "pip_size":    0.01,
+    },
+    {
+        "name":        "GBP/CHF",
+        "epic":        "CS.D.GBPCHF.MINI.IP",
+        "type":        "FX",
+        "point_value": 1.0,
+        "min_size":    0.5,
+        "currency":    "CHF",
+        "pip_size":    0.0001,
+    },
+    {
+        "name":        "EUR/CHF",
+        "epic":        "CS.D.EURCHF.MINI.IP",
+        "type":        "FX",
+        "point_value": 1.0,
+        "min_size":    0.5,
+        "currency":    "CHF",
+        "pip_size":    0.0001,
+    },
+    {
+        "name":        "GBP/AUD",
+        "epic":        "CS.D.GBPAUD.MINI.IP",
+        "type":        "FX",
+        "point_value": 1.0,
+        "min_size":    0.5,
+        "currency":    "AUD",
+        "pip_size":    0.0001,
+    },
+    {
+        "name":        "EUR/AUD",
+        "epic":        "CS.D.EURAUD.MINI.IP",
+        "type":        "FX",
+        "point_value": 1.0,
+        "min_size":    0.5,
+        "currency":    "AUD",
+        "pip_size":    0.0001,
+    },
+    {
+        "name":        "AUD/NZD",
+        "epic":        "CS.D.AUDNZD.MINI.IP",
+        "type":        "FX",
+        "point_value": 1.0,
+        "min_size":    0.5,
+        "currency":    "NZD",
+        "pip_size":    0.0001,
+    },
+    {
+        "name":        "USD/NOK",
+        "epic":        "CS.D.USDNOK.MINI.IP",
+        "type":        "FX",
+        "point_value": 1.0,
+        "min_size":    0.5,
+        "currency":    "NOK",
+        "pip_size":    0.001,
+    },
+    {
+        "name":        "USD/SEK",
+        "epic":        "CS.D.USDSEK.MINI.IP",
+        "type":        "FX",
+        "point_value": 1.0,
+        "min_size":    0.5,
+        "currency":    "SEK",
+        "pip_size":    0.001,
+    },
+    {
+        "name":        "USD/MXN",
+        "epic":        "CS.D.USDMXN.MINI.IP",
+        "type":        "FX",
+        "point_value": 1.0,
+        "min_size":    0.5,
+        "currency":    "MXN",
+        "pip_size":    0.001,
+    },
+
+    # ── BONDS ────────────────────────────────────────────────────────────────
+    {
+        "name":        "US 10yr Treasury",
+        "epic":        "IR.D.10YEAR.DAILY.IP",
+        "type":        "BOND",
+        "point_value": 1.0,
+        "min_size":    0.5,
+        "currency":    "USD",
+        "pip_size":    0.01,
+    },
+    {
+        "name":        "UK Gilt (10yr)",
+        "epic":        "IR.D.GILT10YR.DAILY.IP",
+        "type":        "BOND",
+        "point_value": 1.0,
+        "min_size":    0.5,
+        "currency":    "GBP",
+        "pip_size":    0.01,
+    },
+    {
+        "name":        "German Bund (10yr)",
+        "epic":        "IR.D.BUND.DAILY.IP",
+        "type":        "BOND",
+        "point_value": 1.0,
+        "min_size":    0.5,
+        "currency":    "EUR",
+        "pip_size":    0.01,
+    },
 ]
 
 # Risk parameters (can be overridden via .env)
@@ -145,6 +426,6 @@ DEFAULT_RISK_PCT      = 1.0   # % of account equity risked per trade
 MAX_UNITS_PER_MARKET  = 4     # Turtle rule: max 4 units in one market
 MAX_UNITS_CORRELATED  = 10    # max units in correlated markets (e.g. all FX)
 MAX_UNITS_DIRECTION   = 12    # max total long or short units across all markets
-ATR_STOP_MULTIPLIER   = 2.0   # stop loss distance = N * ATR
-ATR_TARGET_MULTIPLIER = 4.0   # take profit = N * ATR  (2:1 R:R)
+ATR_STOP_MULTIPLIER   = 2.0   # stop loss distance = N × ATR
+ATR_TARGET_MULTIPLIER = 4.0   # take profit = N × ATR  (2:1 R:R)
 PYRAMID_STEP          = 0.5   # add unit every 0.5 ATR in your favour

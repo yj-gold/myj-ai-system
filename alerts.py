@@ -381,7 +381,8 @@ def scan_once(
 
 # ── Main loop ─────────────────────────────────────────────────────────────────
 
-def run(interval_minutes: int, min_score: int, demo: bool, strategy_type: str) -> None:
+def run(interval_minutes: int, min_score: int, demo: bool,
+        strategy_type: str, dema_min_tf: int) -> None:
     base_url = config.BASE_URL_DEMO if demo else config.BASE_URL
 
     alerted: Set[str] = set()   # keys of signals already emailed
@@ -396,8 +397,10 @@ def run(interval_minutes: int, min_score: int, demo: bool, strategy_type: str) -
     print(_b(_c("╔══════════════════════════════════════════════════════════╗")))
     print(_b(_c("║   MYJ CAPITAL  —  REAL-TIME ALERT MONITOR               ║")))
     print(_b(_c(f"║   Strategy      : {strategy_label:<39}║")))
+    print(_b(_c(f"║   Markets       : {len(MARKETS):<39}║")))
     print(_b(_c(f"║   Scan interval : every {interval_minutes} min                          ║")))
     print(_b(_c(f"║   Min score     : {min_score}/100                                 ║")))
+    print(_b(_c(f"║   DEMA min TF   : {dema_min_tf}/5 timeframes aligned              ║")))
     print(_b(_c(f"║   Account       : {'DEMO' if demo else 'LIVE':<8}                              ║")))
     print(_b(_c("║   Press Ctrl+C to stop                                  ║")))
     print(_b(_c("╚══════════════════════════════════════════════════════════╝")))
@@ -421,6 +424,7 @@ def run(interval_minutes: int, min_score: int, demo: bool, strategy_type: str) -
             dema_strat = DEMAMultiTimeframeStrategy(
                 account_equity = equity,
                 risk_pct       = DEFAULT_RISK_PCT / 100,
+                min_tf         = dema_min_tf,
             )
 
             print(f"  [{now_str}] Scanning {len(MARKETS)} markets "
@@ -476,13 +480,15 @@ def run(interval_minutes: int, min_score: int, demo: bool, strategy_type: str) -
 
 def parse_args():
     p = argparse.ArgumentParser(description="MYJ Capital real-time alert monitor")
-    p.add_argument("--interval",  type=int, default=60,
+    p.add_argument("--interval",    type=int, default=60,
                    help="Minutes between scans (default 60)")
-    p.add_argument("--min-score", type=int, default=65,
-                   help="Minimum signal score to alert on (default 65)")
-    p.add_argument("--strategy",  choices=["turtle", "dema", "both"], default="both",
+    p.add_argument("--min-score",   type=int, default=35,
+                   help="Minimum signal score to alert on (default 35)")
+    p.add_argument("--strategy",    choices=["turtle", "dema", "both"], default="both",
                    help="Which strategy to run: turtle, dema, or both (default: both)")
-    p.add_argument("--demo",      action="store_true",
+    p.add_argument("--dema-min-tf", type=int, default=3,
+                   help="DEMA: minimum timeframes that must align out of 5 (default 3)")
+    p.add_argument("--demo",        action="store_true",
                    help="Use IG demo account")
     return p.parse_args()
 
@@ -495,6 +501,7 @@ if __name__ == "__main__":
             min_score        = args.min_score,
             demo             = args.demo,
             strategy_type    = args.strategy,
+            dema_min_tf      = args.dema_min_tf,
         )
     except KeyboardInterrupt:
         print("\n\n  Monitor stopped.")

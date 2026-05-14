@@ -124,8 +124,12 @@ class DEMAMultiTimeframeStrategy:
     """
     DEMA28 multi-timeframe crossover strategy.
 
-    Requires all five timeframes (3min, 5min, 15min, 4h, daily) to
-    simultaneously show price on the same side of DEMA28.
+    Parameters
+    ----------
+    min_tf : int
+        Minimum number of timeframes (out of 5) that must agree for a
+        signal to fire.  Default 3 (3/5 = score 60).  Use 5 for maximum
+        strictness (all timeframes must align, score 100 only).
     """
 
     def __init__(
@@ -134,11 +138,13 @@ class DEMAMultiTimeframeStrategy:
         risk_pct:   float = 0.01,
         atr_stop:   float = 2.0,
         atr_target: float = 4.0,
+        min_tf:     int   = 3,
     ):
         self.equity     = account_equity
         self.risk_pct   = risk_pct
         self.atr_stop   = atr_stop
         self.atr_target = atr_target
+        self.min_tf     = max(1, min(5, min_tf))
 
     # ── Public API ────────────────────────────────────────────────────────────
 
@@ -248,47 +254,51 @@ class DEMAMultiTimeframeStrategy:
     ) -> DEMASignal:
         """Combine timeframe results into a single DEMASignal."""
 
-        all_tfs     = list(TIMEFRAMES.keys())
-        directions  = [tf_directions.get(tf, "WAIT") for tf in all_tfs]
+        all_tfs    = list(TIMEFRAMES.keys())
+        directions = [tf_directions.get(tf, "WAIT") for tf in all_tfs]
 
-        all_long    = all(d == "LONG"  for d in directions)
-        all_short   = all(d == "SHORT" for d in directions)
+        long_count  = sum(1 for d in directions if d == "LONG")
+        short_count = sum(1 for d in directions if d == "SHORT")
 
-        # Score: 20 per timeframe aligned in the winning direction
-        if all_long or all_short:
-            target_dir = "LONG" if all_long else "SHORT"
-            score      = sum(20 for d in directions if d == target_dir)
+        # Dominant direction must have >= min_tf timeframes aligned
+        if long_count >= short_count and long_count >= self.min_tf:
+            target_dir = "LONG"
+            score      = long_count * 20
+        elif short_count > long_count and short_count >= self.min_tf:
+            target_dir = "SHORT"
+            score      = short_count * 20
         else:
             target_dir = None
             score      = 0
 
         # Current price and ATR from daily bars
-        price  = daily_bars[-1].close if daily_bars else 0.0
-        atr_s  = _atr(daily_bars, 20) if len(daily_bars) >= 20 else []
-        atr    = atr_s[-1] if atr_s and not math.isnan(atr_s[-1]) else 0.0
+        price      = daily_bars[-1].close if daily_bars else 0.0
+        atr_s      = _atr(daily_bars, 20) if len(daily_bars) >= 20 else []
+        atr        = atr_s[-1] if atr_s and not math.isnan(atr_s[-1]) else 0.0
         daily_dema = tf_dema_vals.get("daily", 0.0)
 
-        tf_aligned = {tf: tf_directions.get(tf, "WAIT") == target_dir
-                      for tf in all_tfs} if target_dir else {tf: False for tf in all_tfs}
+        tf_aligned = {
+            tf: tf_directions.get(tf, "WAIT") == target_dir
+            for tf in all_tfs
+        } if target_dir else {tf: False for tf in all_tfs}
 
-        # Timeframe alignment summary
         def _tf_icon(tf: str) -> str:
-            d = tf_directions.get(tf, "WAIT")
+            d  = tf_directions.get(tf, "WAIT")
             ok = (d == target_dir) if target_dir else False
             return f"{tf}:{'✓' if ok else '✗'}"
 
         reason = " | ".join(_tf_icon(tf) for tf in all_tfs)
 
-        if not (all_long or all_short) or atr == 0 or price == 0:
-            tf_count = sum(1 for d in directions if d != "WAIT")
+        if target_dir is None or atr == 0 or price == 0:
+            aligned_n = max(long_count, short_count)
             wait_reason = (
-                f"Timeframes aligned: {tf_count}/5 — "
+                f"Aligned {aligned_n}/{len(all_tfs)} (need {self.min_tf}) — "
                 f"{' | '.join(_tf_icon(tf) for tf in all_tfs)}"
             )
             return self._no_signal(market, price, daily_dema, atr, wait_reason)
 
         # Entry, stop, target
-        direction  = "LONG" if all_long else "SHORT"
+        direction = target_dir
         entry      = price
         if direction == "LONG":
             stop   = entry - self.atr_stop   * atr
