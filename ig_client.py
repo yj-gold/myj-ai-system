@@ -152,6 +152,47 @@ class IGClient:
         """Issue an authenticated POST request and return the parsed JSON body."""
         return self._request("POST", endpoint, version=version, json=data)
 
+    def put(
+        self,
+        endpoint: str,
+        version: int = 1,
+        data: Optional[Dict[str, Any]] = None,
+    ) -> Any:
+        """Issue an authenticated PUT request and return the parsed JSON body."""
+        return self._request("PUT", endpoint, version=version, json=data)
+
+    def delete(
+        self,
+        endpoint: str,
+        version: int = 1,
+        data: Optional[Dict[str, Any]] = None,
+    ) -> Any:
+        """
+        Issue an authenticated DELETE request.
+
+        IG uses a POST with _method=DELETE header for position closes
+        (some endpoints require this pattern).
+        """
+        # IG position close requires POST with _method override header
+        headers = self._base_headers(version)
+        headers["_method"] = "DELETE"
+        url = f"{self._base_url}{endpoint}"
+        for attempt in range(1, self._MAX_RETRIES + 1):
+            try:
+                resp = self._session.post(
+                    url, headers=headers, json=data, timeout=30
+                )
+            except requests.RequestException as exc:
+                if attempt == self._MAX_RETRIES:
+                    raise
+                time.sleep(self._BACKOFF_BASE ** attempt)
+                continue
+            self._raise_for_status(resp)
+            if resp.status_code == 204 or not resp.content:
+                return {}
+            return resp.json()
+        raise RuntimeError("Exceeded maximum retries")
+
     # ------------------------------------------------------------------
     # Context manager support
     # ------------------------------------------------------------------

@@ -39,6 +39,7 @@ import config
 from ig_client import IGClient, IGAPIError
 from markets_config import MARKETS, DEFAULT_RISK_PCT
 from strategy_engine import TurtleCTAStrategy, OHLC, Signal
+from trade_executor import TradeExecutor
 
 colorama_init(autoreset=True)
 logger = logging.getLogger(__name__)
@@ -262,6 +263,12 @@ def parse_args():
                    help="Save signals to CSV in ./output/")
     p.add_argument("--no-email",  action="store_true",
                    help="Skip sending email alert")
+    p.add_argument("--execute",   action="store_true",
+                   help="Auto-execute qualifying signals on IG (use with --demo to test)")
+    p.add_argument("--exec-min-score", type=int, default=65,
+                   help="Minimum score to auto-execute a trade (default 65)")
+    p.add_argument("--dry-run",   action="store_true",
+                   help="Show what would be traded without placing real orders")
     p.add_argument("--demo",      action="store_true",
                    help="Use IG demo endpoint")
     p.add_argument("--debug",     action="store_true",
@@ -326,6 +333,16 @@ def main():
         # ── Display table ────────────────────────────────────────────────────
         print_signal_table(signals)
 
+        # ── Execute trades ───────────────────────────────────────────────────
+        if args.execute or args.dry_run:
+            _execute_trades(
+                client   = client,
+                signals  = signals,
+                min_score= args.exec_min_score,
+                dry_run  = args.dry_run,
+                log_dir  = config.OUTPUT_DIR,
+            )
+
         # ── Save CSV ─────────────────────────────────────────────────────────
         if args.save:
             save_signals_csv(signals, config.OUTPUT_DIR)
@@ -340,6 +357,68 @@ def main():
         print("\n  Interrupted.")
     finally:
         client.logout()
+
+
+def _execute_trades(
+    client:    IGClient,
+    signals:   List[Signal],
+    min_score: int,
+    dry_run:   bool,
+    log_dir:   str,
+) -> None:
+    active = [s for s in signals if s.direction != "WAIT" and s.score >= min_score]
+
+    print()
+    print(_b(_c("=" * 80)))
+    mode = "[DRY RUN]" if dry_run else "[LIVE DEMO EXECUTION]"
+    print(_b(_c(f"  {mode}  —  Executing {len(active)} signal(s)  |  min score: {min_score}/100")))
+    print(_b(_c("=" * 80)))
+
+    if not active:
+        print(_y(f"\n  No signals meet the execution threshold (score ≥ {min_score}).\n"))
+        return
+
+    executor = TradeExecutor(
+        client    = client,
+        min_score = min_score,
+        dry_run   = dry_run,
+        log_dir   = log_dir,
+    )
+
+    results = executor.execute_signals(signals)
+
+    print()
+    if not results:
+        print(_y("  No trades executed."))
+        return
+
+    rows = []
+    for r in results:
+        status_str = _g("✓ FILLED") if r.deal_status == "ACCEPTED" else \
+                     (_r("✗ REJECTED") if r.deal_status == "REJECTED" else
+                      _y(f"◆ {r.deal_status}"))
+        rows.append([
+            r.market_name[:22],
+            _g(f"▲ {r.direction}") if r.direction == "LONG" else _r(f"▼ {r.direction}"),
+            f"£{r.unit_size:.2f}/pt",
+            f"{r.actual_level:,.4f}" if r.actual_level else "—",
+            f"{r.stop_loss:,.4f}",
+            f"{r.take_profit:,.4f}",
+            status_str,
+            r.reason[:30] if r.deal_status != "ACCEPTED" else r.deal_id[:16],
+        ])
+
+    print(tabulate(
+        rows,
+        headers=["Market","Dir","Size","Fill","Stop","Target","Status","Detail"],
+        tablefmt="rounded_outline",
+    ))
+    print()
+    accepted = sum(1 for r in results if r.deal_status == "ACCEPTED")
+    print(f"  Summary: {accepted} filled  |  "
+          f"{len(results)-accepted} rejected  |  "
+          f"Log: {log_dir}/trade_log.csv")
+    print()
 
 
 def _send_signal_email(signals: List[Signal], equity: float) -> None:
