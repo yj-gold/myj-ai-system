@@ -4,6 +4,13 @@
 # Output exports
 output/
 
+# Private accounting data — never commit ledgers or statements
+accounting_data/
+statements/
+*.db
+*.sqlite
+*.sqlite3
+
 # Python
 __pycache__/
 *.py[cod]
