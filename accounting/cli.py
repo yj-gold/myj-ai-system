@@ -182,8 +182,37 @@ def cmd_opening(conn, args):
               f"3900 Opening balance equity.")
 
 
+def _pdf_out_paths(args, entity, doc, when, currencies):
+    """One output path per currency; a user-given path gets a currency
+    suffix when several currencies are in play."""
+    import os
+    from . import db
+    if args.pdf is not True:
+        root, ext = os.path.splitext(args.pdf)
+        ext = ext or ".pdf"
+        if len(currencies) == 1:
+            return {currencies[0]: args.pdf if os.path.splitext(args.pdf)[1]
+                    else args.pdf + ext}
+        return {c: f"{root}_{c}{ext}" for c in currencies}
+    out_dir = os.path.join(db.DATA_DIR, "exports")
+    os.makedirs(out_dir, mode=0o700, exist_ok=True)
+    return {c: os.path.join(out_dir, f"{entity['code']}_{doc}_{when}_{c}.pdf")
+            for c in currencies}
+
+
 def cmd_report_balance(conn, args):
     entity = get_entity(conn, args.entity)
+    if args.pdf:
+        from datetime import date
+        from .pdf_report import balance_sheet_pdf, currencies_in_use
+        as_of = args.as_of or date.today().isoformat()
+        ccys = currencies_in_use(conn, entity)
+        paths = _pdf_out_paths(args, entity, "balance_sheet", as_of, ccys)
+        for ccy in ccys:
+            balance_sheet_pdf(conn, entity, paths[ccy], as_of,
+                              compare=args.compare, currency=ccy)
+            print(f"PDF written: {paths[ccy]}")
+        return
     report = balance_sheet(conn, entity, as_of=args.as_of)
     when = args.as_of or "today"
     print(f"\nBALANCE SHEET — {entity['name']} as of {when}")
@@ -204,6 +233,18 @@ def cmd_report_balance(conn, args):
 
 def cmd_report_pnl(conn, args):
     entity = get_entity(conn, args.entity)
+    if args.pdf:
+        from datetime import date
+        from .pdf_report import currencies_in_use, pnl_pdf
+        date_to = args.date_to or date.today().isoformat()
+        date_from = args.date_from or f"{date_to[:4]}-01-01"
+        ccys = currencies_in_use(conn, entity)
+        paths = _pdf_out_paths(args, entity, "profit_loss",
+                               f"{date_from}_{date_to}", ccys)
+        for ccy in ccys:
+            pnl_pdf(conn, entity, paths[ccy], date_from, date_to, currency=ccy)
+            print(f"PDF written: {paths[ccy]}")
+        return
     report = income_statement(conn, entity, date_from=args.date_from,
                               date_to=args.date_to)
     period = f"{args.date_from or 'start'} to {args.date_to or 'today'}"
@@ -400,12 +441,20 @@ def build_parser():
     bs = report_sub.add_parser("balance-sheet")
     bs.add_argument("--entity", required=True)
     bs.add_argument("--as-of")
+    bs.add_argument("--compare",
+                    help="Second (earlier) date for a comparative column")
+    bs.add_argument("--pdf", nargs="?", const=True, default=False,
+                    help="Write a PDF (optionally give the output path); "
+                         "one file per currency in use")
     bs.set_defaults(func=cmd_report_balance)
 
     pnl = report_sub.add_parser("pnl")
     pnl.add_argument("--entity", required=True)
     pnl.add_argument("--date-from")
     pnl.add_argument("--date-to")
+    pnl.add_argument("--pdf", nargs="?", const=True, default=False,
+                    help="Write a PDF (optionally give the output path); "
+                         "one file per currency in use")
     pnl.set_defaults(func=cmd_report_pnl)
 
     cf = report_sub.add_parser("cashflow")

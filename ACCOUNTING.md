@@ -166,6 +166,26 @@ python myj_accounting.py account add 1210 "IC receivable - MYJHOLD" asset \
     --entity MYJCT --counterparty MYJHOLD
 ```
 
+## PDF exports
+
+Balance sheet and P&L can be exported as PDFs in a classic accounting-package
+layout (indented bold account tree, right-aligned amount columns, rules above
+totals, double rule under grand totals, page numbers). One file is written
+per currency in use; requires `reportlab` (`pip install reportlab`).
+
+```bash
+# Balance sheet as of today, with a comparative column for last year-end
+python myj_accounting.py report balance-sheet --entity MYJCT \
+    --compare 2025-12-31 --pdf
+
+# P&L for 2025 to a chosen path
+python myj_accounting.py report pnl --entity MYJCT \
+    --date-from 2025-01-01 --date-to 2025-12-31 --pdf reports/pnl_2025.pdf
+```
+
+Without an explicit path, files go to `accounting_data/exports/` (git-ignored,
+owner-only permissions, like all data).
+
 ## What the reports tell you
 
 - **balance-sheet** — assets, liabilities, equity, and net worth as of a
