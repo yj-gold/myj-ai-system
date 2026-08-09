@@ -26,6 +26,7 @@ DEFAULT_CHART = [
     ("3000", "Partner / shareholder capital", "equity", "financing", 0, 0),
     ("3100", "Retained earnings", "equity", "", 0, 0),
     ("3200", "Owner contributions / drawings", "equity", "financing", 0, 0),
+    ("3900", "Opening balance equity", "equity", "", 0, 0),
     # Income
     ("4000", "Trading income", "income", "operating", 0, 0),
     ("4100", "Interest income", "income", "operating", 0, 0),

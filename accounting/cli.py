@@ -7,9 +7,10 @@ import argparse
 import sys
 
 from . import db
+from .chart import seed_chart
 from .importer import add_rule, import_csv, recategorize_suspense
 from .ledger import (LedgerError, add_account, add_entity, add_entry,
-                     get_entity, list_accounts, list_entities)
+                     get_account, get_entity, list_accounts, list_entities)
 from .reports import (balance_sheet, capex_register, cash_flow,
                       cash_pooling_overview, income_statement,
                       intercompany_matrix)
@@ -136,6 +137,45 @@ def cmd_entry_add(conn, args):
             lines.append((code, 0, -amount, memo))
     entry_id = add_entry(conn, entity["id"], args.date, args.description, lines)
     print(f"Journal entry #{entry_id} recorded for {entity['code']}.")
+
+
+def cmd_opening(conn, args):
+    """Book an opening balance sheet in one entry.
+
+    Balances are given as they appear on the balance sheet (positive
+    numbers); debit/credit side is inferred from the account type. Any
+    difference is booked to 3900 Opening balance equity.
+    """
+    entity = get_entity(conn, args.entity)
+    seed_chart(conn, entity["id"])  # backfill 3900 for older entities
+    lines = []
+    net = 0.0
+    for spec in args.balance:
+        parts = spec.split(":")
+        if len(parts) < 2:
+            raise LedgerError(
+                "Balance format: ACCOUNT:AMOUNT, e.g. 1000:58125.85 2200:20000")
+        code, amount = parts[0], float(parts[1])
+        account = get_account(conn, entity["id"], code)
+        if account["type"] in ("asset", "expense"):
+            lines.append((code, amount, 0, "opening balance"))
+            net += amount
+        else:
+            lines.append((code, 0, amount, "opening balance"))
+            net -= amount
+    if round(net, 2) != 0:
+        if net > 0:
+            lines.append(("3900", 0, net, "opening balance equity"))
+        else:
+            lines.append(("3900", -net, 0, "opening balance equity"))
+    entry_id = add_entry(conn, entity["id"], args.date,
+                         f"Opening balances as of {args.date}", lines,
+                         reference="opening")
+    print(f"Opening balance sheet booked for {entity['code']} as of "
+          f"{args.date} (entry #{entry_id}).")
+    if round(net, 2) != 0:
+        print(f"  Balancing amount of {_money(abs(net))} booked to "
+              f"3900 Opening balance equity.")
 
 
 def cmd_report_balance(conn, args):
@@ -314,6 +354,16 @@ def build_parser():
                              help="ACCOUNT:AMOUNT[:memo]; positive=debit, "
                                   "negative=credit. Must balance to zero.")
     entry_add_p.set_defaults(func=cmd_entry_add)
+
+    opening = sub.add_parser("opening",
+                             help="Book opening balances as of a start date")
+    opening.add_argument("--entity", required=True)
+    opening.add_argument("--date", default="2016-01-01", help="YYYY-MM-DD")
+    opening.add_argument("balance", nargs="+",
+                         help="ACCOUNT:AMOUNT pairs as shown on the balance "
+                              "sheet (positive numbers); difference goes to "
+                              "3900 Opening balance equity")
+    opening.set_defaults(func=cmd_opening)
 
     report = sub.add_parser("report", help="Financial reports")
     report_sub = report.add_subparsers(dest="subcommand", required=True)

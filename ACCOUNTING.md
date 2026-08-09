@@ -51,6 +51,22 @@ python myj_accounting.py entity list
 Every entity gets its own standard chart of accounts (see below) and its own
 ledger; reports like `pooling` and `intercompany` look across all of them.
 
+## Opening balances (starting the books, e.g. as of 2016)
+
+Book the position each entity had on day one; the history you import then
+builds on top of it. Enter balances as they appear on the balance sheet
+(positive numbers) — the tool picks the right debit/credit side and books
+any difference to `3900 Opening balance equity`:
+
+```bash
+# As of 1 Jan 2016: 100k in the bank, 25k at the broker, a 30k loan
+python myj_accounting.py opening --entity MYJCT --date 2016-01-01 \
+    1000:100000 1010:25000 2200:30000
+```
+
+If you know the split of equity (capital vs. retained earnings), book those
+accounts explicitly instead of letting it fall into 3900.
+
 ## Importing statements
 
 The importer accepts most bank/broker CSV exports. It auto-detects common
