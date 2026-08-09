@@ -335,3 +335,35 @@ def currencies_in_use(conn, entity):
         if round(r["bal"], 2) != 0 and ccy not in seen:
             seen.append(ccy)
     return seen or [entity["currency"]]
+
+
+def journal_pdf(conn, entity, path, date_from=None, date_to=None):
+    """Numbered transaction register for line-by-line review."""
+    from .reports import journal
+    rows = journal(conn, entity, date_from=date_from, date_to=date_to)
+    period = f"{date_from or 'start'} to {date_to or 'today'}"
+    doc = _Canvas(path, entity["name"], "Transaction Register",
+                  f"For review - {period}", "All accounts", [])
+    c = doc.c
+    y_cols = {"num": 38, "date": 64, "desc": 112, "counter": 330,
+              "amount_r": 523, "ccy": 528}
+    doc.top = HEADER_BOTTOM
+    for i, (eid_, date, desc, amount, ccy, counter) in enumerate(rows):
+        doc._advance()
+        y = doc._y(doc.top)
+        c.setFont(FONT_B, 7)
+        c.drawString(y_cols["num"], y, f"#{eid_}")
+        c.setFont(FONT_R, 7)
+        c.drawString(y_cols["date"], y, date)
+        label = desc
+        while c.stringWidth(label, FONT_R, 7) > 212 and len(label) > 1:
+            label = label[:-1]
+        c.drawString(y_cols["desc"], y, label)
+        clabel = counter
+        while c.stringWidth(clabel, FONT_R, 7) > 125 and len(clabel) > 1:
+            clabel = clabel[:-1]
+        c.drawString(y_cols["counter"], y, clabel)
+        c.drawRightString(y_cols["amount_r"], y, _fmt(amount))
+        c.drawString(y_cols["ccy"], y, ccy)
+    doc.save()
+    return path

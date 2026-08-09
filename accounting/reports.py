@@ -236,3 +236,43 @@ def cash_pooling_overview(conn, as_of=None):
             })
             totals[ccy] = round(totals.get(ccy, 0.0) + cash, 2)
     return {"rows": rows_out, "total_cash": totals}
+
+
+def journal(conn, entity, date_from=None, date_to=None):
+    """Every journal entry with its non-cash counter-accounts, oldest first.
+    Returns rows: (entry_id, date, description, signed cash amount or main
+    amount, currency, counter-account labels)."""
+    base = entity["currency"]
+    query = """SELECT e.id, e.date, e.description, e.reference
+               FROM journal_entries e WHERE e.entity_id = :eid"""
+    params = {"eid": entity["id"]}
+    if date_from:
+        query += " AND e.date >= :dfrom"
+        params["dfrom"] = date_from
+    if date_to:
+        query += " AND e.date <= :dto"
+        params["dto"] = date_to
+    query += " ORDER BY e.date, e.id"
+    out = []
+    for e in conn.execute(query, params).fetchall():
+        lines = conn.execute(
+            """SELECT a.code, a.name, a.subtype,
+                      COALESCE(NULLIF(a.currency, ''), :base) AS ccy,
+                      l.debit, l.credit
+               FROM journal_lines l JOIN accounts a ON a.id = l.account_id
+               WHERE l.entry_id = :entry""",
+            {"entry": e["id"], "base": base}).fetchall()
+        cash = [l for l in lines if l["subtype"] == "cash"]
+        others = [l for l in lines if l["subtype"] != "cash"]
+        if cash:
+            amount = round(sum(l["debit"] - l["credit"] for l in cash), 2)
+            ccy = cash[0]["ccy"]
+        else:
+            amount = round(sum(l["debit"] for l in lines), 2)
+            ccy = lines[0]["ccy"] if lines else base
+        main = max(others or lines, key=lambda l: l["debit"] + l["credit"])
+        counter = f"{main['code']} {main['name']}"
+        if len(others) > 1:
+            counter += " (+fees)"
+        out.append((e["id"], e["date"], e["description"], amount, ccy, counter))
+    return out

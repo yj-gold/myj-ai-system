@@ -295,6 +295,29 @@ def cmd_report_capex(conn, args):
         print(f"  {'TOTAL CAPEX':<46} {_money(report['totals'][ccy]):>12} {ccy}")
 
 
+def cmd_report_journal(conn, args):
+    from .reports import journal
+    entity = get_entity(conn, args.entity)
+    if args.pdf:
+        from .pdf_report import journal_pdf
+        import os
+        from . import db
+        if args.pdf is not True:
+            path = args.pdf
+        else:
+            out_dir = os.path.join(db.DATA_DIR, "exports")
+            os.makedirs(out_dir, mode=0o700, exist_ok=True)
+            path = os.path.join(out_dir, f"{entity['code']}_journal.pdf")
+        journal_pdf(conn, entity, path, date_from=args.date_from,
+                    date_to=args.date_to)
+        print(f"PDF written: {path}")
+        return
+    for eid_, date, desc, amount, ccy, counter in journal(
+            conn, entity, date_from=args.date_from, date_to=args.date_to):
+        print(f"  #{eid_:<5} {date}  {desc[:44]:<44} {_money(amount):>14} "
+              f"{ccy}  -> {counter[:38]}")
+
+
 def cmd_report_pooling(conn, args):
     overview = cash_pooling_overview(conn, as_of=args.as_of)
     print("\nCASH POOLING OVERVIEW (all entities, per currency)")
@@ -469,6 +492,14 @@ def build_parser():
     capex.add_argument("--date-from")
     capex.add_argument("--date-to")
     capex.set_defaults(func=cmd_report_capex)
+
+    jr = report_sub.add_parser("journal",
+                               help="Numbered transaction register for review")
+    jr.add_argument("--entity", required=True)
+    jr.add_argument("--date-from")
+    jr.add_argument("--date-to")
+    jr.add_argument("--pdf", nargs="?", const=True, default=False)
+    jr.set_defaults(func=cmd_report_journal)
 
     pooling = report_sub.add_parser("pooling")
     pooling.add_argument("--as-of")
