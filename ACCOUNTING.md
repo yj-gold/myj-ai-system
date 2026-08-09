@@ -97,6 +97,39 @@ python myj_accounting.py recategorize --entity MYJCT
 PDF statements: export/convert them to CSV first (most banks offer CSV
 export), or send the rows through a manual journal entry.
 
+## Multiple currencies
+
+Accounts are single-currency; each currency gets its own sub-account
+automatically (e.g. `1000.USD`, `4000.USD`) and all reports show per-currency
+figures — amounts in different currencies are never summed together.
+
+- The importer picks the currency from (in order): `--currency FLAG`, a
+  currency column in the file, or the entity's base currency.
+- For transfers between your own accounts in different currencies, route
+  both legs to `1900 FX / internal transfer clearing` with a rule; whatever
+  balance remains on 1900 after both legs is the FX effect, which you can
+  clear to `4200 FX gains` / `5700 FX losses` periodically:
+
+```bash
+python myj_accounting.py rule add "Transfer to USD account" 1900 --entity MYJCT
+python myj_accounting.py rule add "Incoming transfer from EUR" 1900 --entity MYJCT
+```
+
+## Starting from statements only (no separate opening figures)
+
+If all you have is statements, import the oldest statement of each account
+with `--opening-from-balance`: the opening balance is derived from the first
+row's running balance (balance minus that row's amount) and booked to
+`3900 Opening balance equity` automatically:
+
+```bash
+python myj_accounting.py import statements/bank_2016.csv --entity MYJCT \
+    --cash-account 1000 --opening-from-balance
+```
+
+Use the flag only on the oldest statement of each account, then import the
+later statements normally in chronological order.
+
 ## Manual journal entries
 
 Format: `ACCOUNT:AMOUNT[:memo]`, positive = debit, negative = credit; the

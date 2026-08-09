@@ -34,6 +34,8 @@ CREATE TABLE IF NOT EXISTS accounts (
     is_intercompany INTEGER NOT NULL DEFAULT 0,
     -- for intercompany accounts: which entity is on the other side
     counterparty_entity_id INTEGER REFERENCES entities(id),
+    -- empty means the entity's base currency
+    currency TEXT DEFAULT '',
     UNIQUE (entity_id, code)
 );
 
@@ -102,6 +104,12 @@ def connect(db_path: str = None) -> sqlite3.Connection:
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA foreign_keys = ON")
     conn.executescript(SCHEMA)
+    # Migrations for databases created by earlier versions
+    account_cols = [r[1] for r in conn.execute("PRAGMA table_info(accounts)")]
+    if "currency" not in account_cols:
+        # empty currency means the entity's base currency
+        conn.execute("ALTER TABLE accounts ADD COLUMN currency TEXT DEFAULT ''")
+        conn.commit()
     if created:
         try:
             os.chmod(path, 0o600)

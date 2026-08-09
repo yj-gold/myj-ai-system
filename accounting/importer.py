@@ -118,10 +118,46 @@ def categorize(description, amount, rules):
     return None
 
 
+def currency_account(conn, entity, base_code, ccy):
+    """Return the account code to use for a currency.
+
+    Accounts in the entity's base currency keep their normal code; other
+    currencies get a per-currency sub-account (e.g. 1010.USD), created on
+    first use by cloning the base account. This keeps every account — and
+    therefore every journal entry — single-currency.
+    """
+    ccy = (ccy or "").upper().strip()
+    if not ccy or ccy == entity["currency"]:
+        return base_code
+    code = f"{base_code}.{ccy}"
+    existing = conn.execute(
+        "SELECT id FROM accounts WHERE entity_id = ? AND code = ?",
+        (entity["id"], code),
+    ).fetchone()
+    if existing is None:
+        base = get_account(conn, entity["id"], base_code)
+        conn.execute(
+            """INSERT INTO accounts (entity_id, code, name, type, subtype,
+                                     is_capex, is_intercompany, currency)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+            (entity["id"], code, f"{base['name']} ({ccy})", base["type"],
+             base["subtype"], base["is_capex"], base["is_intercompany"], ccy),
+        )
+    return code
+
+
 def import_csv(conn, entity, filepath, cash_account_code="1000",
                date_col=None, desc_col=None, amount_col=None,
-               debit_col=None, credit_col=None, delimiter=None):
+               debit_col=None, credit_col=None, delimiter=None,
+               currency=None, opening_from_balance=False):
     """Import a bank/broker statement CSV for an entity.
+
+    currency: force the statement's currency (otherwise taken from a
+    currency column if present, else the entity's base currency).
+    opening_from_balance: derive the account's opening balance from the
+    first row's running-balance column (balance minus that row's amount)
+    and book it against 3900 Opening balance equity, dated the first
+    transaction date. Use on the OLDEST statement of each account only.
 
     Returns (statement_id, imported_count, uncategorized_count).
     """
@@ -164,6 +200,7 @@ def import_csv(conn, entity, filepath, cash_account_code="1000",
 
         imported = 0
         uncategorized = 0
+        opening_booked = False
         for row in reader:
             raw_date = (row.get(date_col) or "").strip()
             if not raw_date:
@@ -178,6 +215,35 @@ def import_csv(conn, entity, filepath, cash_account_code="1000",
                 credit = _parse_amount(row.get(credit_col) or "") if credit_col else 0.0
                 # statement debit = money out -> negative
                 amount = credit - abs(debit)
+
+            row_ccy = currency
+            if not row_ccy and currency_col:
+                row_ccy = (row.get(currency_col) or "").strip()
+            row_ccy = (row_ccy or entity["currency"]).upper()
+
+            balance_after = None
+            if balance_col and (row.get(balance_col) or "").strip():
+                balance_after = _parse_amount(row[balance_col])
+
+            cash_code = currency_account(conn, entity, cash_account_code, row_ccy)
+
+            if (opening_from_balance and not opening_booked
+                    and balance_after is not None):
+                opening = round(balance_after - amount, 2)
+                if opening != 0:
+                    equity_code = currency_account(conn, entity, "3900", row_ccy)
+                    if opening > 0:
+                        opening_lines = [(cash_code, opening, 0, ""),
+                                         (equity_code, 0, opening, "")]
+                    else:
+                        opening_lines = [(equity_code, -opening, 0, ""),
+                                         (cash_code, 0, -opening, "")]
+                    add_entry(conn, entity_id, date,
+                              f"Opening balance from statement ({row_ccy})",
+                              opening_lines, reference=f"stmt:{statement_id}",
+                              source="import")
+                opening_booked = True
+
             if amount == 0:
                 continue
 
@@ -185,28 +251,25 @@ def import_csv(conn, entity, filepath, cash_account_code="1000",
             if counter is None:
                 counter = "9000"
                 uncategorized += 1
+            counter_code = currency_account(conn, entity, counter, row_ccy)
 
             if amount > 0:  # money in: debit cash, credit counter-account
-                lines = [(cash_account_code, amount, 0, description),
-                         (counter, 0, amount, description)]
+                lines = [(cash_code, amount, 0, description),
+                         (counter_code, 0, amount, description)]
             else:           # money out: credit cash, debit counter-account
-                lines = [(counter, -amount, 0, description),
-                         (cash_account_code, 0, -amount, description)]
+                lines = [(counter_code, -amount, 0, description),
+                         (cash_code, 0, -amount, description)]
 
             entry_id = add_entry(conn, entity_id, date, description,
                                  lines, reference=f"stmt:{statement_id}",
                                  source="import")
 
-            balance_after = None
-            if balance_col and (row.get(balance_col) or "").strip():
-                balance_after = _parse_amount(row[balance_col])
-            currency = (row.get(currency_col) or "").strip() if currency_col else ""
             conn.execute(
                 """INSERT INTO statement_transactions
                    (statement_id, date, description, amount, currency,
                     balance_after, matched_account_code, entry_id)
                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
-                (statement_id, date, description, amount, currency,
+                (statement_id, date, description, amount, row_ccy,
                  balance_after, counter, entry_id),
             )
             imported += 1
@@ -228,23 +291,27 @@ def add_rule(conn, pattern, account_code, entity_id=None, note=""):
 
 
 def recategorize_suspense(conn, entity):
-    """Re-apply rules to entries currently sitting in suspense (9000)."""
+    """Re-apply rules to entries sitting in suspense (9000 and 9000.CCY),
+    preserving each transaction's currency sub-account."""
     entity_id = entity["id"]
     rules = load_rules(conn, entity_id)
-    suspense = get_account(conn, entity_id, "9000")
     rows = conn.execute(
-        """SELECT l.id AS line_id, l.debit, l.credit, e.description
+        """SELECT l.id AS line_id, l.debit, l.credit, e.description,
+                  a.currency AS ccy
            FROM journal_lines l
            JOIN journal_entries e ON e.id = l.entry_id
-           WHERE l.account_id = ? AND e.entity_id = ?""",
-        (suspense["id"], entity_id),
+           JOIN accounts a ON a.id = l.account_id
+           WHERE a.entity_id = ? AND a.subtype = 'suspense'
+             AND e.entity_id = ?""",
+        (entity_id, entity_id),
     ).fetchall()
     moved = 0
     for row in rows:
         amount = row["debit"] - row["credit"]
         code = categorize(row["description"], amount, rules)
         if code and code != "9000":
-            account = get_account(conn, entity_id, code)
+            target = currency_account(conn, entity, code, row["ccy"])
+            account = get_account(conn, entity_id, target)
             conn.execute("UPDATE journal_lines SET account_id = ? WHERE id = ?",
                          (account["id"], row["line_id"]))
             conn.execute(

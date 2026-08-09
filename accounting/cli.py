@@ -21,13 +21,15 @@ def _money(value, currency=""):
     return f"{formatted} {currency}".strip() if currency else formatted
 
 
-def _print_section(title, rows, currency, total_label, total):
+def _print_section(title, rows, totals, total_label):
+    """rows: (code, name, amount, ccy); totals: {ccy: amount}."""
     print(f"\n{title}")
-    print("-" * 62)
-    for code, name, amount in rows:
+    print("-" * 68)
+    for code, name, amount, ccy in rows:
         label = f"{code}  {name}" if code else name
-        print(f"  {label:<44} {_money(amount, ''):>15}")
-    print(f"  {total_label:<44} {_money(total, ''):>15}")
+        print(f"  {label:<44} {_money(amount):>15} {ccy}")
+    for ccy in sorted(totals):
+        print(f"  {total_label:<44} {_money(totals[ccy]):>15} {ccy}")
 
 
 # ------------------------------------------------------------- commands
@@ -81,7 +83,9 @@ def cmd_import(conn, args):
         conn, entity, args.file, cash_account_code=args.cash_account,
         date_col=args.date_col, desc_col=args.desc_col,
         amount_col=args.amount_col, debit_col=args.debit_col,
-        credit_col=args.credit_col, delimiter=args.delimiter)
+        credit_col=args.credit_col, delimiter=args.delimiter,
+        currency=args.currency,
+        opening_from_balance=args.opening_from_balance)
     print(f"Imported {imported} transactions from {args.file} "
           f"(statement #{statement_id}) into {entity['code']} "
           f"account {args.cash_account}.")
@@ -181,100 +185,116 @@ def cmd_opening(conn, args):
 def cmd_report_balance(conn, args):
     entity = get_entity(conn, args.entity)
     report = balance_sheet(conn, entity, as_of=args.as_of)
-    currency = entity["currency"]
     when = args.as_of or "today"
-    print(f"\nBALANCE SHEET — {entity['name']} ({currency}) as of {when}")
-    _print_section("ASSETS", report["assets"], currency,
-                   "TOTAL ASSETS", report["total_assets"])
-    _print_section("LIABILITIES", report["liabilities"], currency,
-                   "TOTAL LIABILITIES", report["total_liabilities"])
-    _print_section("EQUITY", report["equity"], currency,
-                   "TOTAL EQUITY", report["total_equity"])
-    print(f"\n  NET WORTH (assets - liabilities): "
-          f"{_money(report['net_worth'], currency)}")
+    print(f"\nBALANCE SHEET — {entity['name']} as of {when}")
+    _print_section("ASSETS", report["assets"],
+                   {c: t["assets"] for c, t in report["totals"].items()},
+                   "TOTAL ASSETS")
+    _print_section("LIABILITIES", report["liabilities"],
+                   {c: t["liabilities"] for c, t in report["totals"].items()},
+                   "TOTAL LIABILITIES")
+    _print_section("EQUITY", report["equity"],
+                   {c: t["equity"] for c, t in report["totals"].items()},
+                   "TOTAL EQUITY")
+    print()
+    for ccy, t in sorted(report["totals"].items()):
+        print(f"  NET WORTH (assets - liabilities): "
+              f"{_money(t['net_worth'], ccy)}")
 
 
 def cmd_report_pnl(conn, args):
     entity = get_entity(conn, args.entity)
     report = income_statement(conn, entity, date_from=args.date_from,
                               date_to=args.date_to)
-    currency = entity["currency"]
     period = f"{args.date_from or 'start'} to {args.date_to or 'today'}"
-    print(f"\nINCOME STATEMENT — {entity['name']} ({currency}), {period}")
-    _print_section("INCOME", report["income"], currency,
-                   "TOTAL INCOME", report["total_income"])
-    _print_section("EXPENSES", report["expenses"], currency,
-                   "TOTAL EXPENSES", report["total_expenses"])
-    print(f"\n  NET INCOME: {_money(report['net_income'], currency)}")
+    print(f"\nINCOME STATEMENT — {entity['name']}, {period}")
+    _print_section("INCOME", report["income"],
+                   {c: t["income"] for c, t in report["totals"].items()},
+                   "TOTAL INCOME")
+    _print_section("EXPENSES", report["expenses"],
+                   {c: t["expenses"] for c, t in report["totals"].items()},
+                   "TOTAL EXPENSES")
+    print()
+    for ccy, t in sorted(report["totals"].items()):
+        print(f"  NET INCOME: {_money(t['net_income'], ccy)}")
 
 
 def cmd_report_cashflow(conn, args):
     entity = get_entity(conn, args.entity)
     report = cash_flow(conn, entity, date_from=args.date_from,
                        date_to=args.date_to)
-    currency = entity["currency"]
     period = f"{args.date_from or 'start'} to {args.date_to or 'today'}"
-    print(f"\nCASH FLOW — {entity['name']} ({currency}), {period}")
-    print("-" * 62)
-    for bucket in ("operating", "investing", "financing"):
-        print(f"  {bucket.capitalize():<44} {_money(report[bucket]):>15}")
-        if args.detail:
-            for date, desc, delta in report["details"][bucket]:
-                print(f"      {date}  {desc[:36]:<36} {_money(delta):>12}")
-    print(f"  {'NET CHANGE IN CASH':<44} {_money(report['net_change']):>15}")
+    print(f"\nCASH FLOW — {entity['name']}, {period}")
+    if not report:
+        print("  No cash movements in the period.")
+    for ccy in sorted(report):
+        flows = report[ccy]
+        print(f"\n  [{ccy}]")
+        print("  " + "-" * 62)
+        for bucket in ("operating", "investing", "financing"):
+            print(f"  {bucket.capitalize():<44} {_money(flows[bucket]):>15}")
+            if args.detail:
+                for date, desc, delta in flows["details"][bucket]:
+                    print(f"      {date}  {desc[:36]:<36} {_money(delta):>12}")
+        print(f"  {'NET CHANGE IN CASH':<44} {_money(flows['net_change']):>15}")
 
 
 def cmd_report_capex(conn, args):
     entity = get_entity(conn, args.entity)
     report = capex_register(conn, entity, date_from=args.date_from,
                             date_to=args.date_to)
-    currency = entity["currency"]
-    print(f"\nCAPEX REGISTER — {entity['name']} ({currency})")
-    print("-" * 62)
+    print(f"\nCAPEX REGISTER — {entity['name']}")
+    print("-" * 68)
     if not report["items"]:
         print("  No CAPEX movements recorded.")
     for r in report["items"]:
-        print(f"  {r['date']}  {r['code']}  {r['description'][:34]:<34} "
-              f"{_money(r['amount']):>12}")
-    print(f"  {'TOTAL CAPEX':<48} {_money(report['total']):>12}")
+        print(f"  {r['date']}  {r['code']}  {r['description'][:32]:<32} "
+              f"{_money(r['amount']):>12} {r['ccy']}")
+    for ccy in sorted(report["totals"]):
+        print(f"  {'TOTAL CAPEX':<46} {_money(report['totals'][ccy]):>12} {ccy}")
 
 
 def cmd_report_pooling(conn, args):
     overview = cash_pooling_overview(conn, as_of=args.as_of)
-    print("\nCASH POOLING OVERVIEW (all entities)")
-    print("-" * 70)
-    print(f"  {'Entity':<10} {'Cash':>14} {'IC net':>14} {'Pooled':>14}  Ccy")
-    for row in overview["entities"]:
+    print("\nCASH POOLING OVERVIEW (all entities, per currency)")
+    print("-" * 72)
+    print(f"  {'Entity':<10} {'Ccy':<4} {'Cash':>14} {'IC net':>14} {'Pooled':>14}")
+    for row in overview["rows"]:
         ent = row["entity"]
-        print(f"  {ent['code']:<10} {_money(row['cash']):>14} "
+        print(f"  {ent['code']:<10} {row['ccy']:<4} {_money(row['cash']):>14} "
               f"{_money(row['intercompany_net']):>14} "
-              f"{_money(row['pooled_position']):>14}  {ent['currency']}")
-    print(f"\n  Total cash across entities: {_money(overview['total_cash'])}")
-    print("  (positions are in each entity's own currency — do not sum across"
-          " currencies)")
-    surplus = [r for r in overview["entities"] if r["pooled_position"] > 0]
-    deficit = [r for r in overview["entities"] if r["pooled_position"] < 0]
-    if surplus and deficit:
-        print("\n  Pooling opportunity: surplus at "
-              + ", ".join(r["entity"]["code"] for r in surplus)
-              + " could fund " + ", ".join(r["entity"]["code"] for r in deficit)
-              + " via intercompany loans (document terms and arm's-length"
-                " interest).")
+              f"{_money(row['pooled_position']):>14}")
+    print("\n  Total cash across entities:")
+    for ccy in sorted(overview["total_cash"]):
+        print(f"    {ccy}: {_money(overview['total_cash'][ccy])}")
+    for ccy in sorted({r["ccy"] for r in overview["rows"]}):
+        surplus = [r for r in overview["rows"]
+                   if r["ccy"] == ccy and r["pooled_position"] > 0]
+        deficit = [r for r in overview["rows"]
+                   if r["ccy"] == ccy and r["pooled_position"] < 0]
+        if surplus and deficit:
+            print(f"\n  Pooling opportunity ({ccy}): surplus at "
+                  + ", ".join(r["entity"]["code"] for r in surplus)
+                  + " could fund "
+                  + ", ".join(r["entity"]["code"] for r in deficit)
+                  + " via intercompany loans (document terms and"
+                    " arm's-length interest).")
 
 
 def cmd_report_intercompany(conn, args):
     positions = intercompany_matrix(conn)
     print("\nINTERCOMPANY POSITIONS")
-    print("-" * 62)
+    print("-" * 68)
     if not positions:
         print("  No intercompany accounts with activity.")
     for pos in positions:
         ent = pos["entity"]
-        print(f"  {ent['code']} net intercompany: "
-              f"{_money(pos['net'], ent['currency'])}")
+        nets = ", ".join(f"{_money(v, c)}" for c, v in sorted(pos["nets"].items()))
+        print(f"  {ent['code']} net intercompany: {nets}")
         for a in pos["accounts"]:
             if a["bal"]:
-                print(f"      {a['code']} {a['name']:<40} {_money(a['bal']):>12}")
+                print(f"      {a['code']} {a['name']:<40} "
+                      f"{_money(a['bal']):>12} {a['ccy']}")
 
 
 # ------------------------------------------------------------- parser
@@ -326,6 +346,15 @@ def build_parser():
     imp.add_argument("--debit-col")
     imp.add_argument("--credit-col")
     imp.add_argument("--delimiter")
+    imp.add_argument("--currency",
+                     help="Force the statement currency (e.g. USD). Otherwise "
+                          "taken from a currency column, else the entity's "
+                          "base currency. Non-base currencies get their own "
+                          "sub-accounts (e.g. 1010.USD).")
+    imp.add_argument("--opening-from-balance", action="store_true",
+                     help="Derive the account's opening balance from the "
+                          "first row's running balance and book it to 3900. "
+                          "Use on the OLDEST statement of each account only.")
     imp.set_defaults(func=cmd_import)
 
     rule = sub.add_parser("rule", help="Categorization rules for imports")

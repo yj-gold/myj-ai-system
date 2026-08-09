@@ -16,6 +16,7 @@ DEFAULT_CHART = [
     ("1510", "Fixed assets - IT & software", "asset", "fixed_asset", 1, 0),
     ("1590", "Accumulated depreciation", "asset", "contra", 0, 0),
     ("1800", "Prepaid expenses & deposits", "asset", "receivable", 0, 0),
+    ("1900", "FX / internal transfer clearing", "asset", "clearing", 0, 0),
     # Liabilities
     ("2000", "Accounts payable", "liability", "payable", 0, 0),
     ("2100", "Intercompany payable", "liability", "intercompany", 0, 1),
