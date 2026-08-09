@@ -151,7 +151,7 @@ ASSET_GROUPS = [
     ("Checking/Savings", lambda a: a["subtype"] == "cash"),
     ("Other Current Assets",
      lambda a: a["subtype"] in ("receivable", "intercompany", "suspense",
-                                "clearing")),
+                                "clearing", "investment")),
     ("Fixed Assets", lambda a: a["is_capex"] or a["subtype"] in
      ("fixed_asset", "contra")),
     ("Other Assets", lambda a: True),
@@ -159,7 +159,8 @@ ASSET_GROUPS = [
 
 LIABILITY_GROUPS = [
     ("Other Current Liabilities",
-     lambda a: a["subtype"] in ("payable", "tax", "intercompany", "")),
+     lambda a: a["subtype"] in ("payable", "tax", "intercompany",
+                                "investor", "")),
     ("Long Term Liabilities", lambda a: True),
 ]
 

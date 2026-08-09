@@ -142,11 +142,12 @@ def cash_flow(conn, entity, date_from=None, date_to=None):
         ).fetchall()
         bucket = "operating"
         for c in counters:
-            if c["is_capex"] or c["subtype"] == "fixed_asset":
+            if (c["is_capex"] or c["subtype"] == "fixed_asset"
+                    or c["subtype"] == "investment"):
                 bucket = "investing"
                 break
             if (c["subtype"] == "financing" or c["type"] == "equity"
-                    or c["is_intercompany"]):
+                    or c["is_intercompany"] or c["subtype"] == "investor"):
                 bucket = "financing"
                 break
         delta = round(entry["cash_delta"], 2)
