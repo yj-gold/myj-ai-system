@@ -276,3 +276,39 @@ def journal(conn, entity, date_from=None, date_to=None):
             counter += " (+fees)"
         out.append((e["id"], e["date"], e["description"], amount, ccy, counter))
     return out
+
+
+def equity_changes(conn, entity, date_from, date_to):
+    """Movements in equity for the period, per currency: opening equity,
+    net result, capital movements booked on equity accounts, closing."""
+    base = entity["currency"]
+
+    def totals(as_of=None, date_from_=None):
+        rows = _balances(conn, entity["id"], as_of=as_of, date_from=date_from_)
+        eq, ni = {}, {}
+        for r in rows:
+            ccy = r["currency"] or base
+            if r["type"] == "equity":
+                eq[ccy] = eq.get(ccy, 0.0) - r["bal"]
+            elif r["type"] in ("income", "expense"):
+                ni[ccy] = ni.get(ccy, 0.0) - r["bal"]
+        return eq, ni
+
+    from datetime import datetime, timedelta
+    day_before = (datetime.strptime(date_from, "%Y-%m-%d")
+                  - timedelta(days=1)).strftime("%Y-%m-%d")
+    open_eq, open_ni = totals(as_of=day_before)
+    per_eq, per_ni = totals(as_of=date_to, date_from_=date_from)
+
+    currencies = sorted(set(open_eq) | set(open_ni) | set(per_eq) | set(per_ni))
+    out = {}
+    for ccy in currencies:
+        opening = round(open_eq.get(ccy, 0.0) + open_ni.get(ccy, 0.0), 2)
+        capital = round(per_eq.get(ccy, 0.0), 2)
+        result = round(per_ni.get(ccy, 0.0), 2)
+        closing = round(opening + capital + result, 2)
+        if opening == 0 and capital == 0 and result == 0:
+            continue
+        out[ccy] = {"opening": opening, "capital_movements": capital,
+                    "net_result": result, "closing": closing}
+    return out

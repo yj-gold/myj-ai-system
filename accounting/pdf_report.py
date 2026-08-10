@@ -367,3 +367,84 @@ def journal_pdf(conn, entity, path, date_from=None, date_to=None):
         c.drawString(y_cols["ccy"], y, ccy)
     doc.save()
     return path
+
+
+def cash_flow_pdf(conn, entity, path, date_from, date_to, currency=None,
+                  basis="Cash Basis"):
+    from .reports import cash_flow
+    currency = currency or entity["currency"]
+    flows = cash_flow(conn, entity, date_from=date_from, date_to=date_to)
+    data = flows.get(currency)
+    subtitle = (f"{_pretty_date(date_from)} through {_pretty_date(date_to)}"
+                f" ({currency})")
+    doc = _Canvas(path, entity["name"], "Statement of Cash Flows", subtitle,
+                  basis, [f"{_short_date(date_from)} - {_short_date(date_to)}"])
+    if not data:
+        doc.row("No cash movements in the period.", 0)
+        doc.save()
+        return path
+    labels = {"operating": "OPERATING ACTIVITIES",
+              "investing": "INVESTING ACTIVITIES",
+              "financing": "FINANCING ACTIVITIES"}
+    for bucket in ("operating", "investing", "financing"):
+        doc.row(labels[bucket], 0, kind="section")
+        for date, desc, delta in data["details"][bucket]:
+            doc.row(f"{date}  {desc}", 1, [delta])
+        doc.row(f"Net cash from {bucket} activities", 0,
+                [data[bucket]], kind="total")
+    doc.row("NET CHANGE IN CASH", 0, [data["net_change"]], kind="grand")
+    doc.save()
+    return path
+
+
+def equity_changes_pdf(conn, entity, path, date_from, date_to,
+                       basis="Cash Basis"):
+    from .reports import equity_changes
+    data = equity_changes(conn, entity, date_from, date_to)
+    subtitle = f"{_pretty_date(date_from)} through {_pretty_date(date_to)}"
+    doc = _Canvas(path, entity["name"], "Statement of Changes in Equity",
+                  subtitle, basis, [])
+    for ccy, row in data.items():
+        doc.row(f"EQUITY ({ccy})", 0, kind="section")
+        doc.row(f"Equity at {_pretty_date(date_from)} (opening)", 1,
+                [row["opening"]])
+        doc.row("Partner capital contributions / withdrawals", 1,
+                [row["capital_movements"]])
+        doc.row("Net result for the period", 1, [row["net_result"]])
+        doc.row(f"Equity at {_pretty_date(date_to)} (closing)", 1,
+                [row["closing"]], kind="grand")
+    doc.save()
+    return path
+
+
+def notes_pdf(entity, path, as_of, sections, basis="Cash Basis"):
+    """sections: list of (heading, [paragraph, ...])."""
+    doc = _Canvas(path, entity["name"], "Notes to the Financial Statements",
+                  f"As of {_pretty_date(as_of)}", basis, [])
+    c = doc.c
+    n = 0
+    for heading, paragraphs in sections:
+        n += 1
+        doc._advance(SECTION_GAP)
+        c.setFont(FONT_B, 9)
+        c.drawString(BASE_X - 60, doc._y(doc.top), f"{n}. {heading}")
+        c.setFont(FONT_R, 8)
+        for para in paragraphs:
+            words = para.split()
+            line = ""
+            for w in words:
+                test = (line + " " + w).strip()
+                if c.stringWidth(test, FONT_R, 8) > 440:
+                    doc._advance()
+                    c.setFont(FONT_R, 8)
+                    c.drawString(BASE_X - 50, doc._y(doc.top), line)
+                    line = w
+                else:
+                    line = test
+            if line:
+                doc._advance()
+                c.setFont(FONT_R, 8)
+                c.drawString(BASE_X - 50, doc._y(doc.top), line)
+            doc._advance(2)
+    doc.save()
+    return path
