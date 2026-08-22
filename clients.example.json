@@ -1,0 +1,52 @@
+{
+  "_comment": [
+    "Registre des clients MYJ Capital — copier en clients.json et compléter.",
+    "AUCUN SECRET ICI : les identifiants IG sont désignés par le NOM de la",
+    "variable d'environnement qui les contient (suffixe _env).",
+    "status: 'active' = client en cours, inclus dans le run mensuel.",
+    "template: 'latest' suit le modèle courant ; 'v2' fige le client sur ce",
+    "modèle précis (utile pour un mandat dont la présentation ne doit pas bouger)."
+  ],
+  "clients": [
+    {
+      "id": "dupont-jean",
+      "name": "Jean Dupont",
+      "status": "active",
+      "account_ref": "IG-ABC12",
+      "mandate": "Mandat discrétionnaire — CTA Trend Following",
+      "since": "2026-01",
+      "template": "latest",
+      "email_to": ["jean.dupont@example.com"],
+      "email_cc": ["backoffice@myjcapital.com"],
+      "ig": {
+        "account_type": "LIVE",
+        "account_id": "ABC12",
+        "api_key_env": "IG_API_KEY_DUPONT",
+        "username_env": "IG_USERNAME_DUPONT",
+        "password_env": "IG_PASSWORD_DUPONT"
+      }
+    },
+    {
+      "id": "martin-sophie",
+      "name": "Sophie Martin",
+      "status": "active",
+      "account_ref": "IG-XYZ89",
+      "mandate": "Mandat conseillé",
+      "since": "2026-04",
+      "template": "v2",
+      "email_to": ["sophie.martin@example.com"],
+      "ig": {
+        "account_type": "LIVE",
+        "account_id": "XYZ89"
+      }
+    },
+    {
+      "id": "ancien-client",
+      "name": "Compte clôturé",
+      "status": "inactive",
+      "since": "2025-02",
+      "template": "v1",
+      "email_to": []
+    }
+  ]
+}

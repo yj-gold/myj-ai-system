@@ -142,16 +142,17 @@ MOCK_ACCOUNTS = [
     }
 ]
 
-html = build_html_email(
-    analytics=MOCK,
-    accounts=MOCK_ACCOUNTS,
-    from_date="2024-04-12",
-    to_date="2026-04-12",
-)
+if __name__ == "__main__":
+    html = build_html_email(
+        analytics=MOCK,
+        accounts=MOCK_ACCOUNTS,
+        from_date="2024-04-12",
+        to_date="2026-04-12",
+    )
 
-out = "preview_email.html"
-with open(out, "w", encoding="utf-8") as f:
-    f.write(html)
+    out = "preview_email.html"
+    with open(out, "w", encoding="utf-8") as f:
+        f.write(html)
 
-print(f"Preview saved → {out}")
-print("Open it in your browser to see the exact email design.")
+    print(f"Preview saved → {out}")
+    print("Open it in your browser to see the exact email design.")

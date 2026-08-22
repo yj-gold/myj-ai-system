@@ -1,0 +1,24 @@
+name: Verrou des modèles de relevé
+
+# Refuse toute modification d'un modèle déjà utilisé pour un relevé envoyé.
+on:
+  push:
+    branches: ["**"]
+    paths: ["templates/**", "verify_templates.py"]
+  pull_request:
+    paths: ["templates/**", "verify_templates.py"]
+
+jobs:
+  verrou:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - run: pip install -r requirements.txt
+      - name: Empreintes des modèles archivés
+        run: python verify_templates.py
+      - name: Tests de la chaîne de relevés
+        run: python test_releves.py

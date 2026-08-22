@@ -19,3 +19,15 @@ build/
 .vscode/
 .idea/
 *.swp
+
+# Registre client réel (noms, e-mails) — versionnez-le seulement si le dépôt
+# est privé et que vous acceptez d'y conserver ces données personnelles.
+clients.json
+
+# Archive des relevés clients (données financières nominatives)
+# Le MODÈLE, lui, est versionné dans templates/ — voir docs/RELEVES.md
+archive/
+preview_releve.html
+
+# Environnement virtuel local
+.venv/

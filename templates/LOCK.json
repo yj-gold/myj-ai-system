@@ -1,0 +1,8 @@
+{
+  "_comment": "Empreintes SHA-256 des modèles gelés. Une modification d'un modèle déjà publié doit être refusée : créer une nouvelle version à la place.",
+  "templates": {
+    "v1": "dfa637ba2766c011949e5dda78688f3f213b64fd1c5fe2d16b4b057c00abdce3",
+    "v2": "4663dace93971f757db2dbeb3bbf0697dffbf306ec3a2cd9626beb717a50c3dd"
+  },
+  "latest": "v2"
+}

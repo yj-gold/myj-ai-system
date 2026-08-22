@@ -1,0 +1,92 @@
+name: Relevés mensuels clients
+
+# Exécution automatique le 3 de chaque mois à 06:00 UTC : les opérations du
+# mois échu sont alors définitivement comptabilisées côté IG.
+on:
+  schedule:
+    - cron: "0 6 3 * *"
+  workflow_dispatch:
+    inputs:
+      month:
+        description: "Période à traiter (YYYY-MM, vide = mois échu)"
+        required: false
+      dry_run:
+        description: "Générer sans envoyer d'e-mail"
+        type: boolean
+        default: false
+
+jobs:
+  releves:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Installer les dépendances
+        run: pip install -r requirements.txt
+
+      - name: Contrôler l'intégrité des modèles archivés
+        run: python verify_templates.py
+
+      - name: Tests hors-ligne de la chaîne de relevés
+        run: python test_releves.py
+
+      # L'archive des relevés (données clients) vit hors du dépôt : elle est
+      # restaurée avant le run et re-déposée après, en artefact chiffré côté
+      # GitHub. Pour une conservation longue durée, remplacer ces deux étapes
+      # par une synchronisation vers votre stockage (S3, Drive, NAS…).
+      - name: Restaurer l'archive des relevés
+        uses: actions/download-artifact@v4
+        continue-on-error: true
+        with:
+          name: archive-releves
+          path: archive
+
+      - name: Restaurer le registre client
+        env:
+          CLIENTS_JSON: ${{ secrets.CLIENTS_JSON }}
+        run: |
+          if [ -z "$CLIENTS_JSON" ]; then
+            echo "::error::Le secret CLIENTS_JSON est vide — registre client absent."
+            exit 1
+          fi
+          printf '%s' "$CLIENTS_JSON" > clients.json
+          python -c "import clients; print(len(clients.active_clients()), 'client(s) actif(s)')"
+
+      - name: Générer et envoyer les relevés
+        env:
+          IG_API_KEY: ${{ secrets.IG_API_KEY }}
+          IG_USERNAME: ${{ secrets.IG_USERNAME }}
+          IG_PASSWORD: ${{ secrets.IG_PASSWORD }}
+          IG_ACCOUNT_TYPE: ${{ vars.IG_ACCOUNT_TYPE || 'LIVE' }}
+          EMAIL_FROM: ${{ secrets.EMAIL_FROM }}
+          EMAIL_SMTP_HOST: ${{ secrets.EMAIL_SMTP_HOST }}
+          EMAIL_SMTP_PORT: ${{ secrets.EMAIL_SMTP_PORT }}
+          EMAIL_SMTP_USERNAME: ${{ secrets.EMAIL_SMTP_USERNAME }}
+          EMAIL_SMTP_PASSWORD: ${{ secrets.EMAIL_SMTP_PASSWORD }}
+          # Identifiants IG par client (ajouter un bloc par client du registre)
+          IG_API_KEY_DUPONT: ${{ secrets.IG_API_KEY_DUPONT }}
+          IG_USERNAME_DUPONT: ${{ secrets.IG_USERNAME_DUPONT }}
+          IG_PASSWORD_DUPONT: ${{ secrets.IG_PASSWORD_DUPONT }}
+        run: |
+          python monthly_report.py \
+            ${{ inputs.month && format('--month {0}', inputs.month) || '' }} \
+            ${{ inputs.dry_run && '--dry-run' || '' }}
+
+      - name: Nettoyer le registre client
+        if: always()
+        run: rm -f clients.json
+
+      - name: Conserver l'archive des relevés
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: archive-releves
+          path: archive
+          retention-days: 90
+          overwrite: true
